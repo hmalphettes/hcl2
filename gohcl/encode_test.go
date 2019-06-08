@@ -4,7 +4,10 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/hcl2/gohcl"
+	"github.com/hashicorp/hcl2/hcl"
+	"github.com/hashicorp/hcl2/hcl/hclsyntax"
 	"github.com/hashicorp/hcl2/hclwrite"
+	"github.com/zclconf/go-cty/cty"
 )
 
 func ExampleEncodeIntoBody() {
@@ -13,14 +16,19 @@ func ExampleEncodeIntoBody() {
 		Exe  []string `hcl:"executable"`
 	}
 	type Constraints struct {
-		OS   string `hcl:"os"`
-		Arch string `hcl:"arch"`
+		OS     string   `hcl:"os"`
+		Arch   string   `hcl:"arch"`
+		Config hcl.Body `hcl:",remain"`
+	}
+	type Locals struct {
+		Definitions hcl.Attributes `hcl:",remain"`
 	}
 	type App struct {
 		Name        string       `hcl:"name"`
 		Desc        string       `hcl:"description"`
 		Constraints *Constraints `hcl:"constraints,block"`
 		Services    []Service    `hcl:"service,block"`
+		Locals      []*Locals    `hcl:"locals,block"`
 	}
 
 	app := App{
@@ -38,6 +46,26 @@ func ExampleEncodeIntoBody() {
 			{
 				Name: "worker",
 				Exe:  []string{"./worker"},
+			},
+		},
+		Locals: []*Locals{
+			&Locals{
+				Definitions: hcl.Attributes{
+					"hello": &hcl.Attribute{
+						Name: "hello",
+						Expr: hcl.StaticExpr(cty.StringVal("world"), hcl.Range{}),
+					},
+					"foo": &hcl.Attribute{
+						Name: "foo",
+						Expr: &hclsyntax.ScopeTraversalExpr{
+							Traversal: hcl.Traversal{
+								hcl.TraverseRoot{
+									Name: "bar",
+								},
+							},
+						},
+					},
+				},
 			},
 		},
 	}
@@ -60,5 +88,10 @@ func ExampleEncodeIntoBody() {
 	// }
 	// service "worker" {
 	//   executable = ["./worker"]
+	// }
+	//
+	// locals {
+	//   hello = "world"
+	//   foo   = bar
 	// }
 }
